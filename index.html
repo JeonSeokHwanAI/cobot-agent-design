@@ -3,526 +3,862 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>cobot_automation_hub — 멀티 에이전트 설계</title>
-<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<title>AI WorkSpace 인터뷰로 Agent 만들기</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
 :root{
-  --navy:#111827;--navy2:#1e2d4f;--teal:#0d9488;--teal2:#14b8a6;
-  --mint:#ccfbf1;--slate:#334155;--muted:#94a3b8;--light:#f1f5f9;
-  --orange:#f97316;--blue:#3b82f6;--green:#22c55e;
-  --purple:#8b5cf6;--red:#ef4444;--yellow:#f59e0b;
+  --bg:#f0f0f0;--cell:#ffffff;--border:#c0c0c0;--border-light:#d8d8d8;
+  --hdr-bg:#4472c4;--hdr-tx:#ffffff;
+  --tx:#1a1a1a;--tx2:#333333;--tx3:#555555;
+  --green:#16a34a;--green-bg:#0c0c0c;--green-tx:#4ade80;--green-dim:#22633a;
+  --accent:#2563eb;--accent2:#1e40af;
+  --tag-bg:#dbeafe;--tag-tx:#1e40af;
+  --warn-bg:#fef3c7;--warn-tx:#92400e;
+  --err-bg:#fee2e2;--err-tx:#991b1b;
+  --ok-bg:#dcfce7;--ok-tx:#166534;
 }
-html,body{width:100%;height:100%;overflow:hidden;background:#0a0f1e;font-family:'Pretendard','Apple SD Gothic Neo',sans-serif;}
+html{font-size:16px;}
+body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Pretendard',sans-serif;color:var(--tx);}
 #deck{position:relative;width:100vw;height:100vh;}
-.slide{position:absolute;inset:0;opacity:0;transform:translateX(40px);transition:opacity .42s ease,transform .42s ease;pointer-events:none;}
-.slide.active{opacity:1;transform:translateX(0);pointer-events:all;}
-.slide.exit{opacity:0;transform:translateX(-40px);}
-#prog{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--teal),var(--teal2));z-index:999;transition:width .4s;}
-#snum{position:fixed;top:1rem;right:1.4rem;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:rgba(255,255,255,.3);z-index:999;}
-#dots{position:fixed;right:1rem;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:.4rem;z-index:999;}
-.dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.2);cursor:pointer;transition:all .3s;}
-.dot.on{background:var(--teal);transform:scale(1.6);}
-#nav{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.7rem;background:rgba(17,24,39,.85);backdrop-filter:blur(12px);border:1px solid rgba(13,148,136,.25);border-radius:40px;padding:.45rem 1.1rem;z-index:999;}
-#nav button{background:none;border:none;cursor:pointer;color:var(--teal2);font-size:1rem;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .2s;}
-#nav button:hover{background:rgba(13,148,136,.2);}
-#nav button:disabled{color:rgba(255,255,255,.18);cursor:default;}
+.slide{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity .3s ease;overflow-y:auto;}
+.slide.active{opacity:1;pointer-events:all;}
+
+/* NAV */
+#prog{position:fixed;top:0;left:0;height:3px;background:#ffffff;z-index:999;transition:width .4s;}
+#snum{position:fixed;top:.7rem;right:1.2rem;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:#4ade80;z-index:999;}
+#nav{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.8rem;background:rgba(20,20,20,.95);backdrop-filter:blur(8px);border:1px solid #333;border-radius:8px;padding:.5rem 1rem;z-index:999;box-shadow:0 2px 12px rgba(0,0,0,.4);}
+#nav button{background:none;border:1px solid #444;cursor:pointer;color:#4ade80;font-size:1rem;width:36px;height:36px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+#nav button:hover{background:#333;}
+#nav button:disabled{color:#555;border-color:#333;cursor:default;}
 #nav button:disabled:hover{background:none;}
-#ctr{font-size:.7rem;color:var(--muted);font-family:'JetBrains Mono',monospace;min-width:40px;text-align:center;}
+#ctr{font-size:.85rem;color:#4ade80;font-family:'JetBrains Mono',monospace;min-width:50px;text-align:center;}
 
-/* ── LAYOUT SHELL ── */
-.pg{display:grid;width:100%;height:100vh;}
-.pg-dark{background:var(--navy);}
-.pg-light{background:var(--light);}
+/* SLIDE LAYOUT */
+.pg{display:flex;flex-direction:column;width:100%;min-height:100vh;background:#1a1a1a;}
+.pg-hdr{background:#217346;padding:.8rem 2rem;display:flex;align-items:center;border-bottom:2px solid #185c37;}
+.pg-hdr h2{font-size:1.5rem;font-weight:700;color:#ffffff;}
+.pg-body{flex:1;padding:.8rem 1.5rem 3.5rem;display:flex;flex-direction:column;background:#1a1a1a;}
+.pg-foot{background:#111111;border-top:1px solid #333;padding:.5rem 2rem;text-align:center;font-size:.9rem;color:#4ade80;}
 
-.hdr{display:flex;align-items:center;padding:0 3vw;flex-shrink:0;position:relative;}
-.hdr::before{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--teal);}
-.hdr-d{background:#182032;}
-.hdr-l{background:var(--navy2);}
-.hdr h2{font-size:clamp(1.1rem,1.8vw,1.6rem);font-weight:700;color:#fff;padding-left:.6rem;}
+/* EXCEL GRID */
+.xgrid{display:grid;gap:0;border:1px solid #333;flex:1;min-height:0;}
+.xcell{background:#0c0c0c;padding:1rem 1.3rem;overflow:hidden;display:flex;flex-direction:column;justify-content:center;border:1px solid #333;}
+.xcell:nth-child(odd){background:#0c0c0c;}
+.xcell:nth-child(even){background:#141414;}
+.xcell h3{font-size:1.9rem;font-weight:700;color:#4ade80;margin-bottom:.5rem;border-bottom:1px solid #333;padding-bottom:.35rem;}
+.xcell h4{font-size:1.75rem;font-weight:600;color:#86efac;margin-bottom:.4rem;}
+.xcell p,.xcell li{font-size:1.55rem;color:#e5e7eb;line-height:1.75;}
+.xcell ul{list-style:none;padding:0;}
+.xcell ul li{padding-left:1.2em;position:relative;margin-bottom:.2rem;}
+.xcell ul li::before{content:">";position:absolute;left:0;color:var(--green);font-weight:700;font-family:'JetBrains Mono',monospace;}
 
-.bdy{flex:1;min-height:0;padding:2vh 3vw;display:flex;flex-direction:column;}
+/* TERMINAL CODE BLOCK */
+pre.term{background:var(--green-bg);border:1px solid #333;border-radius:6px;padding:.8rem 1.2rem;font-family:'JetBrains Mono',monospace;font-size:1rem;line-height:1.7;color:var(--green-tx);overflow-x:auto;white-space:pre;}
+pre.term .dim{color:#6b7280;}
+pre.term .wh{color:#e5e7eb;}
+pre.term .yl{color:#fbbf24;}
+pre.term .or{color:#fb923c;}
+pre.term .rd{color:#f87171;}
+pre.term .bl{color:#60a5fa;}
+pre.term .cy{color:#22d3ee;}
+pre.term .mg{color:#c084fc;}
 
-.ftr{display:flex;align-items:center;justify-content:center;padding:0 3vw;flex-shrink:0;}
-.ftr-d{background:#182032;}
-.ftr-l{background:var(--navy2);}
-.ftr p{font-size:clamp(.6rem,.75vw,.8rem);color:var(--teal2);font-family:'JetBrains Mono',monospace;text-align:center;}
+/* EXCEL TABLE */
+.xtbl{width:100%;border-collapse:collapse;font-size:1.1rem;}
+.xtbl th{background:#217346;color:#ffffff;font-weight:600;padding:.6rem 1rem;border:1px solid #185c37;text-align:left;}
+.xtbl td{padding:.55rem 1rem;border:1px solid #333;color:#e5e7eb;}
+.xtbl tr:nth-child(even) td{background:#141414;}
+.xtbl tr:nth-child(odd) td{background:#0c0c0c;}
+.xtbl .mdl{font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--accent2);}
 
-/* ══ S1 TITLE ══ */
-.s1{background:var(--navy);display:flex;align-items:center;}
-.s1-lb{position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--teal);}
-.s1-glow{position:absolute;right:-15vw;top:-20vh;width:60vw;height:80vh;border-radius:50%;background:radial-gradient(circle,rgba(13,148,136,.13) 0%,transparent 65%);pointer-events:none;}
-.s1-c{padding:0 7vw;position:relative;z-index:1;}
-.s1-badge{display:inline-block;background:var(--teal);color:#fff;font-size:clamp(.55rem,.7vw,.75rem);font-weight:700;letter-spacing:.18em;padding:.3rem .9rem;border-radius:2px;margin-bottom:3vh;}
-.s1-title{font-size:clamp(2.2rem,5vw,4.5rem);font-weight:900;color:#fff;line-height:1.05;letter-spacing:-.025em;margin-bottom:1.2vh;}
-.s1-sub{font-size:clamp(.9rem,1.8vw,1.6rem);color:var(--teal2);font-weight:300;margin-bottom:2.5vh;}
-.s1-bar{width:60px;height:3px;background:var(--teal);margin-bottom:2.5vh;}
-.s1-desc{font-size:clamp(.78rem,1vw,1rem);color:var(--muted);line-height:1.8;}
-.s1-foot{position:absolute;bottom:2.5vh;left:7vw;right:7vw;display:flex;justify-content:space-between;font-size:clamp(.65rem,.8vw,.85rem);}
+/* TAGS */
+.tag{display:inline-block;font-size:.95rem;font-weight:600;padding:.25rem .6rem;border-radius:3px;}
+.tag-blue{background:var(--tag-bg);color:var(--tag-tx);}
+.tag-warn{background:var(--warn-bg);color:var(--warn-tx);}
+.tag-err{background:var(--err-bg);color:var(--err-tx);}
+.tag-ok{background:var(--ok-bg);color:var(--ok-tx);}
 
-/* ══ S2 OVERVIEW ══ */
-.s2{grid-template-rows:7vh 1fr 5.5vh;}
-.ov-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:2vw;flex:1;min-height:0;}
-.info-card{background:#fff;border-radius:10px;padding:2.5vh 2vw;border-left:4px solid var(--teal);display:flex;flex-direction:column;justify-content:space-around;}
-.ic-lbl{font-size:clamp(.58rem,.7vw,.75rem);font-weight:700;letter-spacing:.12em;color:var(--teal);text-transform:uppercase;}
-.ic-main{font-size:clamp(.85rem,1.1vw,1.1rem);font-weight:700;color:var(--navy);}
-.irow{display:flex;align-items:flex-start;gap:.6rem;}
-.idot{width:7px;height:7px;border-radius:50%;background:var(--teal);flex-shrink:0;margin-top:.3rem;}
-.irow span{font-size:clamp(.72rem,.9vw,.95rem);color:var(--slate);line-height:1.5;}
-code.tag{background:#f1f5f9;padding:.1rem .35rem;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:.85em;}
-code.warn{background:#fee2e2;color:#991b1b;padding:.1rem .35rem;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:.85em;}
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:1.5vh 1.2vw;}
-.stat{border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
-.stat-n{font-size:clamp(2.5rem,5vh,4rem);font-weight:900;color:#fff;line-height:1;}
-.stat-l{font-size:clamp(.7rem,.85vh,.9rem);color:rgba(255,255,255,.85);margin-top:.4vh;font-weight:500;}
-
-/* ══ S3 AGENT VS SKILL ══ */
-.s3{grid-template-rows:7vh 1fr 5.5vh;}
-.vs-wrap{display:grid;grid-template-columns:1fr 5vw 1fr;gap:1.5vw;flex:1;min-height:0;}
-.vs-card{border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
-.vs-hd{padding:1.8vh 1.5vw;flex-shrink:0;}
-.vs-hd h3{font-size:clamp(.9rem,1.3vw,1.2rem);font-weight:800;color:#fff;letter-spacing:.04em;}
-.vs-hd p{font-size:clamp(.65rem,.85vw,.9rem);color:rgba(255,255,255,.7);margin-top:.3vh;}
-.vs-bd{flex:1;background:#fff;display:flex;flex-direction:column;min-height:0;}
-.vs-row{display:flex;align-items:stretch;border-bottom:1px solid #f1f5f9;flex:1;min-height:0;}
-.vs-row:last-child{border-bottom:none;}
-.vs-key{font-size:clamp(.65rem,.8vw,.82rem);font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;width:5.5vw;flex-shrink:0;text-align:center;line-height:1.3;}
-.vs-val{font-size:clamp(.72rem,.9vw,.95rem);color:var(--slate);display:flex;align-items:center;padding:.5vh 1vw;line-height:1.5;flex:1;}
-.vs-mid{display:flex;align-items:center;justify-content:center;}
-.vs-badge{width:4.5vw;height:4.5vw;max-width:56px;max-height:56px;border-radius:50%;background:var(--yellow);display:flex;align-items:center;justify-content:center;font-size:clamp(.8rem,1vw,1rem);font-weight:900;color:var(--navy);}
-
-/* ══ S4 ARCHITECTURE ══ */
-.s4{grid-template-rows:7vh 1fr;}
-.arch{display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;flex:1;min-height:0;padding:0 3vw 1.5vh;}
-.arch-pm{background:var(--yellow);color:var(--navy);font-weight:800;font-size:clamp(.75rem,1vw,1rem);padding:.7vh 2.5vw;border-radius:6px;}
-.arch-con{display:flex;flex-direction:column;align-items:center;gap:0;}
-.arch-line{width:2px;height:2.5vh;background:rgba(13,148,136,.4);}
-.arch-arr{font-size:clamp(.7rem,.9vw,.9rem);color:var(--teal2);line-height:1;}
-.arch-main{background:var(--teal);border-radius:8px;padding:.8vh 2vw;text-align:center;width:42vw;max-width:540px;}
-.arch-main strong{display:block;font-size:clamp(.8rem,1.1vw,1.05rem);font-weight:800;color:#fff;}
-.arch-main span{font-size:clamp(.58rem,.75vw,.78rem);color:var(--mint);}
-.arch-agents{display:grid;grid-template-columns:repeat(6,1fr);gap:1vw;width:100%;}
-.agbox{border-radius:8px;padding:1.2vh .8vw;text-align:center;display:flex;flex-direction:column;gap:.3vh;}
-.ag-id{font-size:clamp(.52rem,.65vw,.68rem);font-family:'JetBrains Mono',monospace;color:rgba(255,255,255,.65);}
-.ag-name{font-size:clamp(.72rem,.95vw,.98rem);font-weight:700;color:#fff;}
-.ag-mdl{font-size:clamp(.55rem,.68vw,.7rem);color:rgba(255,255,255,.6);}
-.ag-role{font-size:clamp(.6rem,.75vw,.78rem);color:rgba(255,255,255,.8);line-height:1.4;margin-top:.2vh;}
-.arch-orc{width:100%;background:rgba(55,65,81,.75);border:1.5px solid var(--red);border-radius:8px;padding:1.2vh 1.5vw;display:flex;align-items:center;gap:1.2vw;}
-.orc-ic{font-size:clamp(1.1rem,2vh,1.6rem);flex-shrink:0;}
-.orc-tx strong{color:#fff;font-size:clamp(.75rem,1vw,.95rem);}
-.orc-tx p{color:var(--muted);font-size:clamp(.6rem,.75vw,.78rem);margin-top:.3vh;line-height:1.5;}
-
-/* ══ S5 DATA FLOW ══ */
-.s5{grid-template-rows:7vh 1fr 5.5vh;}
-.flow-outer{display:grid;grid-template-columns:1fr 1.8fr 1fr;gap:1.5vw;flex:1;min-height:0;}
-.flow-col{display:flex;flex-direction:column;gap:.8vh;min-height:0;}
-.fc-h{font-size:clamp(.58rem,.72vw,.75rem);font-weight:700;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;flex-shrink:0;}
-.fitem{background:#fff;border-radius:6px;padding:.9vh .9vw;font-size:clamp(.7rem,.88vw,.92rem);color:var(--slate);border-left:3px solid;display:flex;align-items:center;gap:.5vw;flex:1;min-height:0;}
-.ficon{font-size:clamp(.8rem,1.1vh,1rem);flex-shrink:0;}
-.flow-mid{display:flex;flex-direction:column;gap:.7vh;min-height:0;}
-.agflow{border-radius:6px;padding:.9vh 1vw;color:#fff;display:flex;justify-content:space-between;align-items:center;flex:1;min-height:0;}
-.af-n{font-size:clamp(.72rem,.9vw,.92rem);font-weight:700;}
-.af-s{font-size:clamp(.55rem,.68vw,.7rem);color:rgba(255,255,255,.75);font-family:'JetBrains Mono',monospace;}
-.fnote{background:rgba(13,148,136,.08);border:1px solid rgba(13,148,136,.2);border-radius:6px;padding:.7vh .8vw;font-size:clamp(.62rem,.78vw,.82rem);color:var(--slate);text-align:center;flex-shrink:0;}
-
-/* ══ S6 ORCHESTRATOR ══ */
-.s6{grid-template-rows:7vh 1fr;}
-.orc-outer{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr auto;gap:1.5vw;flex:1;min-height:0;padding:2vh 3vw;}
-.cmp{background:rgba(30,45,79,.6);border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:2vh 1.5vw;display:flex;flex-direction:column;justify-content:space-evenly;}
-.cmp.hl{border-color:var(--red);}
-.cmp-h{font-size:clamp(.6rem,.75vw,.78rem);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:1vh;}
-.cstep{text-align:center;padding:.7vh .8vw;background:rgba(255,255,255,.05);border-radius:5px;font-size:clamp(.72rem,.9vw,.92rem);color:rgba(255,255,255,.85);}
-.cstep.hls{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);}
-.carr{text-align:center;font-size:1rem;color:rgba(255,255,255,.3);padding:.2vh 0;}
-.orc-feats{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:1.2vw;}
-.feat{background:rgba(55,65,81,.5);border:1px solid rgba(239,68,68,.35);border-radius:10px;padding:2vh 1.2vw;display:flex;flex-direction:column;align-items:center;gap:1vh;}
-.feat-ic{font-size:clamp(1.2rem,2.2vh,1.6rem);}
-.feat h4{font-size:clamp(.75rem,.95vw,.98rem);font-weight:700;color:var(--red);}
-.feat p{font-size:clamp(.65rem,.82vw,.86rem);color:var(--muted);text-align:center;line-height:1.6;}
-
-/* ══ S7 MATRIX ══ */
-.s7{grid-template-rows:7vh 1fr 5.5vh;}
-.mx-wrap{flex:1;min-height:0;display:flex;flex-direction:column;gap:1.5vh;}
-table{width:100%;border-collapse:collapse;}
-thead tr{background:var(--navy);}
-th{padding:.7vh .8vw;text-align:center;color:#fff;font-size:clamp(.58rem,.72vw,.76rem);font-weight:600;}
-th:first-child{text-align:left;}
-td{padding:.55vh .7vw;border:1px solid #e2e8f0;text-align:center;background:#fff;color:var(--slate);font-size:clamp(.62rem,.78vw,.82rem);}
-tr:nth-child(even) td{background:#f8fafc;}
-td:first-child{text-align:left;font-weight:700;color:var(--navy);background:#eef2f7!important;}
-.ct{font-size:clamp(.56rem,.7vw,.72rem);background:#f0fdf4;color:#166534;border-radius:3px;padding:.1rem .35rem;display:inline-block;}
-.cr{font-size:clamp(.56rem,.7vw,.72rem);background:#fef2f2;color:#991b1b;border-radius:3px;padding:.1rem .35rem;display:inline-block;}
-.hub-b{font-size:.6rem;background:var(--teal);color:#fff;border-radius:2px;padding:.1rem .3rem;margin-left:.3rem;font-weight:700;}
-.mx-notes{display:grid;grid-template-columns:1fr 1fr;gap:1vw;flex-shrink:0;}
-.mnote{background:#fff;border-radius:6px;padding:1.2vh 1vw;border-left:3px solid;}
-.mnote strong{font-size:clamp(.7rem,.88vw,.9rem);color:var(--navy);display:block;margin-bottom:.4vh;}
-.mnote p{font-size:clamp(.62rem,.78vw,.82rem);color:var(--slate);}
-
-/* ══ S8 COMPARISON ══ */
-.s8{grid-template-rows:7vh 1fr 5.5vh;}
-.cw{flex:1;min-height:0;overflow:hidden;}
-.cw table td,.cw table th{font-size:clamp(.65rem,.82vw,.86rem);}
-.cw th:first-child{width:18%;}
-.cw th:nth-child(2),.cw th:nth-child(3){width:30%;}
-.cw th:last-child{width:22%;}
-.ck{color:var(--green);font-size:clamp(.8rem,1vh,.95rem);}
-.star-c{color:var(--yellow);font-size:clamp(.65rem,.82vw,.86rem);font-weight:700;}
-tr.srow td{background:#fffbeb!important;}
-
-/* ══ S9 ROADMAP ══ */
-.s9{grid-template-rows:7vh 1fr 5.5vh;}
-.ph-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5vw;flex:1;min-height:0;}
-.ph-card{background:#fff;border-radius:10px;overflow:hidden;display:flex;flex-direction:column;}
-.ph-head{padding:1.8vh 1.5vw;flex-shrink:0;}
-.ph-lbl{font-size:clamp(.55rem,.68vw,.7rem);font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.7);text-transform:uppercase;margin-bottom:.3vh;}
-.ph-head h3{font-size:clamp(.85rem,1.1vw,1.05rem);font-weight:800;color:#fff;}
-.ph-body{flex:1;padding:1.5vh 1.5vw;display:flex;flex-direction:column;justify-content:space-evenly;}
-.phitem{display:flex;align-items:flex-start;gap:.6vw;}
-.phdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:.35rem;}
-.phitem span{font-size:clamp(.7rem,.88vw,.92rem);color:var(--slate);line-height:1.55;}
-.ph-foot{padding:.9vh 1.5vw;border-top:1px solid #f1f5f9;text-align:center;font-size:clamp(.68rem,.85vw,.88rem);font-weight:700;flex-shrink:0;}
-
-/* ══ S10 SUMMARY ══ */
-.s10{grid-template-rows:1fr 6vh;}
-.sum-b{display:flex;flex-direction:column;justify-content:center;padding:4vh 7vw;gap:2.5vh;}
-.sum-t{font-size:clamp(.85rem,1.1vw,1.1rem);font-weight:700;color:var(--teal2);margin-bottom:.5vh;}
-.prow{display:flex;align-items:flex-start;gap:1.2vw;}
-.pnum{background:var(--teal);color:#fff;font-size:clamp(.7rem,.88vw,.88rem);font-weight:800;font-family:'JetBrains Mono',monospace;padding:.35rem .7rem;border-radius:4px;flex-shrink:0;margin-top:.1rem;}
-.ptxt strong{display:block;font-size:clamp(.82rem,1.05vw,1rem);color:#fff;font-weight:700;margin-bottom:.3vh;}
-.ptxt span{font-size:clamp(.7rem,.88vw,.9rem);color:var(--muted);line-height:1.6;}
-.sum-foot{background:#182032;display:flex;align-items:center;justify-content:space-between;padding:0 7vw;}
-.sum-foot span{font-size:clamp(.65rem,.8vw,.82rem);color:var(--muted);}
-.sum-foot .tf{color:var(--teal2);}
+/* S1 TITLE */
+.s1{background:#0c0c0c;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+.s1-c{text-align:center;padding:0 7vw;}
+.s1-badge{display:inline-block;border:1px solid var(--green);color:var(--green-tx);font-size:.85rem;font-weight:600;letter-spacing:.15em;padding:.4rem 1.2rem;border-radius:3px;margin-bottom:2.5rem;font-family:'JetBrains Mono',monospace;}
+.s1-title{font-size:3.5rem;font-weight:900;color:#fff;line-height:1.15;margin-bottom:1rem;}
+.s1-sub{font-size:1.35rem;color:var(--green-tx);font-weight:300;margin-bottom:2.5rem;}
+.s1-bar{width:80px;height:2px;background:var(--green);margin:0 auto 2.5rem;}
+.s1-desc{font-family:'JetBrains Mono',monospace;font-size:1.3rem;color:#9ca3af;line-height:2.2;}
+.s1-desc span{color:var(--green-tx);}
+.s1-foot{position:absolute;bottom:2.5vh;left:4vw;right:4vw;display:flex;justify-content:space-between;font-size:1.3rem;color:#9ca3af;}
 </style>
 </head>
 <body>
 <div id="prog"></div>
-<div id="snum">01 / 10</div>
-<div id="dots"></div>
+<div id="snum">01 / 14</div>
 <div id="deck">
 
 <!-- S1 TITLE -->
 <div class="slide active">
   <div class="s1">
-    <div class="s1-lb"></div>
-    <div class="s1-glow"></div>
     <div class="s1-c">
-      <div class="s1-badge">AGENT SYSTEM DESIGN</div>
-      <h1 class="s1-title">cobot_automation_hub</h1>
-      <p class="s1-sub">멀티 에이전트 설계 발표</p>
+      <div class="s1-badge">INTERVIEW-DRIVEN AGENT DESIGN</div>
+      <h1 class="s1-title">AI WorkSpace<br>인터뷰로 Agent 만들기</h1>
+      <p class="s1-sub">사람의 업무를 AI 능력 단위로 재분류하는 설계 프로세스</p>
       <div class="s1-bar"></div>
-      <p class="s1-desc">PM 업무 자동화 시스템 &nbsp;·&nbsp; Agent · Skill · Orchestrator 아키텍처<br>Claude Code 기반 &nbsp;·&nbsp; 6 Agents &nbsp;·&nbsp; 11 Skills &nbsp;·&nbsp; Guardian Orchestrator</p>
+      <p class="s1-desc">
+        <span>cobot_automation_hub</span> · PM 업무 자동화 프로젝트<br>
+        인터뷰 → 워크시트 → 설계서 → 프로젝트 자동 구성<br>
+        <span style="font-size:1.6rem;">도움: 안상영 · automation-pipeline-design-eduv</span>
+      </p>
     </div>
     <div class="s1-foot">
-      <span style="color:var(--muted)">Cobot PM · 2026</span>
-      <span style="color:var(--teal2)">Claude Code 기반 자동화</span>
+      <span>전석환 · Cobot PM · 2026</span>
     </div>
   </div>
 </div>
 
-<!-- S2 OVERVIEW -->
+<!-- S2 JOURNEY -->
 <div class="slide">
-  <div class="pg pg-light s2">
-    <div class="hdr hdr-l"><h2>프로젝트 개요</h2></div>
-    <div class="bdy">
-      <div class="ov-grid">
-        <div class="info-card">
-          <div class="ic-lbl">프로젝트 목적</div>
-          <div class="ic-main">Cobot 사업 PM 업무 자동화 허브</div>
-          <div class="irow"><div class="idot"></div><span>4개 팀 총괄 (시뮬레이션 · 문서관리 · 리서치 · 커뮤니티)</span></div>
-          <div class="irow"><div class="idot"></div><span>정부과제 사업신청서 자료 준비 및 서류 제출</span></div>
-          <div class="irow"><div class="idot"></div><span>카카오톡 업무 요청 → 자동 분석 및 처리</span></div>
-          <div class="irow"><div class="idot"></div><span>산출물 <code class="tag">.md</code> 작업 후 제출용 <code class="tag">.hwp</code> 변환</span></div>
-          <div class="irow"><div class="idot"></div><span>파일명: <code class="tag">{내용}_{날짜}_{버전}.md</code></span></div>
-          <div class="irow"><div class="idot"></div><span>Human-in-the-loop: <code class="warn">[확인 필요]</code> 태그로 PM 승인 강제화</span></div>
+  <div class="pg">
+    <div class="pg-hdr"><h2>어떻게 만들었나: 설계부터 병목 해결까지</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr) .6fr;">
+        <div class="xcell">
+          <h4><span class="tag tag-blue">Step 1</span> 요구사항 정의</h4>
+          <p>PM 업무 5가지를 AI가 잘하는 능력 단위로 분석·재분류.<br>"사람 기준 업무 칸막이"에서 "AI 능력 분류"로 관점 전환.</p>
         </div>
-        <div class="stats">
-          <div class="stat" style="background:var(--teal)"><div class="stat-n">6</div><div class="stat-l">Agents</div></div>
-          <div class="stat" style="background:var(--blue)"><div class="stat-n">11</div><div class="stat-l">Skills</div></div>
-          <div class="stat" style="background:var(--orange)"><div class="stat-n">4</div><div class="stat-l">Teams</div></div>
-          <div class="stat" style="background:var(--navy2)"><div class="stat-n">1</div><div class="stat-l">Guardian</div></div>
+        <div class="xcell">
+          <h4><span class="tag tag-blue">Step 2</span> Agent별 인터뷰</h4>
+          <p>CLAUDE_1201~1205 — 5개 Agent 각각 7라운드 질문형 인터뷰.<br>실제 문서를 참조하며 진행. 라운드당 3개 이하 질문.</p>
+        </div>
+        <div class="xcell">
+          <h4><span class="tag tag-blue">Step 3</span> 워크시트 통합</h4>
+          <p>5개 개별 워크시트를 통합 인터뷰로 재구성.<br>Agent 간 데이터 흐름, 긴급도 순서, 빈칸 항목 도출.</p>
+        </div>
+        <div class="xcell">
+          <h4><span class="tag tag-blue">Step 4</span> 프로젝트 설계서</h4>
+          <p>Claude Code 공식 Agent-Skill 가이드 참고.<br>폴더 구조·Agent 정의·Skill 할당·model·tools 일괄 설계.</p>
+        </div>
+        <div class="xcell">
+          <h4><span class="tag tag-err">Step 5</span> 구현 & 병목 발견</h4>
+          <p>Agent 5개 + Skill 12개를 만들었으나 <strong>산출물 0건</strong>.<br>"설계 완료"와 "실행 검증"은 완전히 다른 문제.</p>
+        </div>
+        <div class="xcell">
+          <h4><span class="tag tag-ok">Step 6</span> 보완 인터뷰 & 최적화</h4>
+          <p>중급 자료(automation-pipeline-design-eduv) 활용 재인터뷰.<br>Guardian <strong>orchestrator Agent 추가</strong>. 실행 검증 완료.</p>
+        </div>
+        <div class="xcell" style="grid-column:1/-1;background:#1e3a2a;">
+          <h4 style="color:#4ade80;border:none;padding:0;margin:0">핵심 교훈</h4>
+          <p>인터뷰가 설계를 바꾼다 — 바로 코딩하면 범위가 틀어짐. 그레이 영역이 코딩 전에 드러남. 기존 자산 분석 먼저 — 중복 설계 방지.</p>
         </div>
       </div>
     </div>
-    <div class="ftr ftr-l"><p>Claude Code 기반 &nbsp;|&nbsp; CLAUDE.md 라우터 &nbsp;|&nbsp; Human-in-the-loop 설계</p></div>
+    <div class="pg-foot">automation-pipeline-design-eduv 6단계 파이프라인 기반 | 인터뷰 → 워크시트 → 설계 → 도구 연결 → 실행 → Agent 변환</div>
   </div>
 </div>
 
-<!-- S3 AGENT VS SKILL -->
+<!-- S3 INSIGHT: 관점 전환 카드 -->
 <div class="slide">
-  <div class="pg pg-light s3">
-    <div class="hdr hdr-l"><h2>Agent vs Skill: 핵심 차이</h2></div>
-    <div class="bdy">
-      <div class="vs-wrap">
-        <div class="vs-card">
-          <div class="vs-hd" style="background:var(--navy2)">
-            <h3>AGENT</h3>
-            <p>사고하는 존재 (Thinker)</p>
-          </div>
-          <div class="vs-bd">
-            <div class="vs-row"><div class="vs-key" style="background:var(--teal)">판단</div><div class="vs-val">상황에 따라 다르게 결정하고 계획을 수립합니다</div></div>
-            <div class="vs-row"><div class="vs-key" style="background:var(--teal)">자율성</div><div class="vs-val">스스로 계획 → 실행 → 평가 루프를 반복합니다</div></div>
-            <div class="vs-row"><div class="vs-key" style="background:var(--teal)">재시도</div><div class="vs-val">결과가 불충분하면 스스로 재시도합니다</div></div>
-            <div class="vs-row"><div class="vs-key" style="background:var(--teal)">협력</div><div class="vs-val">메인 세션을 통해 다른 Agent와 연계합니다</div></div>
-            <div class="vs-row"><div class="vs-key" style="background:var(--teal)">예시</div><div class="vs-val" style="font-family:'JetBrains Mono',monospace;color:var(--teal)">researcher · reviewer · community</div></div>
+  <div class="pg">
+    <div class="pg-hdr"><h2>관점 전환: 사람 업무 → AI Agent 능력 재분류</h2></div>
+    <div class="pg-body" style="justify-content:center;gap:1.2rem;padding:1.5rem 3rem 4rem;">
+      <div style="display:flex;align-items:center;gap:1.5rem;background:#141414;border:1px solid #333;border-radius:8px;padding:1.2rem 2rem;">
+        <div style="flex:1;">
+          <div style="font-size:1rem;color:#888;margin-bottom:.3rem;">사람의 업무</div>
+          <div style="font-size:1.6rem;font-weight:700;color:#e5e7eb;">정부과제 서류 준비</div>
+        </div>
+        <div style="font-size:2rem;color:#4ade80;font-family:'JetBrains Mono',monospace;">→</div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:700;color:#60a5fa;">doc-manager</div>
+          <div style="font-size:1.1rem;color:#9ca3af;margin-top:.2rem;">문서 분류 · 변환 · 체크리스트</div>
+        </div>
+        <div style="background:#217346;padding:.4rem .8rem;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:600;color:#fff;">Agentic RAG</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1.5rem;background:#141414;border:1px solid #333;border-radius:8px;padding:1.2rem 2rem;">
+        <div style="flex:1;">
+          <div style="font-size:1rem;color:#888;margin-bottom:.3rem;">사람의 업무</div>
+          <div style="font-size:1.6rem;font-weight:700;color:#e5e7eb;">시스템 개발 외주</div>
+        </div>
+        <div style="font-size:2rem;color:#4ade80;font-family:'JetBrains Mono',monospace;">→</div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:700;color:#c084fc;">simulator</div>
+          <div style="font-size:1.1rem;color:#9ca3af;margin-top:.2rem;">코드 리뷰 · 기술 문서 작성</div>
+        </div>
+        <div style="background:#217346;padding:.4rem .8rem;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:600;color:#fff;">CodeAct</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1.5rem;background:#141414;border:1px solid #333;border-radius:8px;padding:1.2rem 2rem;">
+        <div style="flex:1;">
+          <div style="font-size:1rem;color:#888;margin-bottom:.3rem;">사람의 업무</div>
+          <div style="font-size:1.6rem;font-weight:700;color:#e5e7eb;">자료 조사 · 분석</div>
+        </div>
+        <div style="font-size:2rem;color:#4ade80;font-family:'JetBrains Mono',monospace;">→</div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:700;color:#4ade80;">researcher</div>
+          <div style="font-size:1.1rem;color:#9ca3af;margin-top:.2rem;">웹 검색 · 특허/논문 조사</div>
+        </div>
+        <div style="background:#217346;padding:.4rem .8rem;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:600;color:#fff;">ReAct</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1.5rem;background:#141414;border:1px solid #333;border-radius:8px;padding:1.2rem 2rem;">
+        <div style="flex:1;">
+          <div style="font-size:1rem;color:#888;margin-bottom:.3rem;">사람의 업무</div>
+          <div style="font-size:1.6rem;font-weight:700;color:#e5e7eb;">4개 팀 소통 · 일정</div>
+        </div>
+        <div style="font-size:2rem;color:#4ade80;font-family:'JetBrains Mono',monospace;">→</div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:700;color:#f97316;">community</div>
+          <div style="font-size:1.1rem;color:#9ca3af;margin-top:.2rem;">카톡 파싱 · 캘린더 연동</div>
+        </div>
+        <div style="background:#217346;padding:.4rem .8rem;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:600;color:#fff;">Tool Use</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:1.5rem;background:#141414;border:1px solid #333;border-radius:8px;padding:1.2rem 2rem;">
+        <div style="flex:1;">
+          <div style="font-size:1rem;color:#888;margin-bottom:.3rem;">사람의 업무</div>
+          <div style="font-size:1.6rem;font-weight:700;color:#e5e7eb;">산출물 품질 확인</div>
+        </div>
+        <div style="font-size:2rem;color:#4ade80;font-family:'JetBrains Mono',monospace;">→</div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:1.8rem;font-weight:700;color:#f87171;">reviewer</div>
+          <div style="font-size:1.1rem;color:#9ca3af;margin-top:.2rem;">품질 검토 · 피드백 루프</div>
+        </div>
+        <div style="background:#217346;padding:.4rem .8rem;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:600;color:#fff;">Self-Reflect</div>
+      </div>
+    </div>
+    <div class="pg-foot">업무 성격 → Agent 패턴 → model 등급 + 필요 tools 자동 결정</div>
+  </div>
+</div>
+
+<!-- S4 INTERVIEWS -->
+<div class="slide">
+  <div class="pg">
+    <div class="pg-hdr"><h2>Agent별 인터뷰: doc-manager 예시</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr;">
+        <div class="xcell" style="border-left:3px solid var(--accent);">
+          <h3 style="color:var(--accent)">doc-manager 시뮬레이션 <span class="tag tag-blue">Agentic RAG</span></h3>
+          <div style="display:flex;flex-direction:column;gap:.55rem;font-size:.82rem;line-height:1.65;">
+            <div style="background:#ffffff;color:#1a1a1a;padding:.45rem .8rem;border-radius:6px 6px 0 6px;font-size:.82rem;align-self:flex-end;max-width:92%;">정부과제 지원사업 (사업신청서, 사업계획서 등) hwp 필수문서를 AI 관점에서 작업한다고 생각하고 인터뷰 해줘</div>
+            <div style="color:#4ade80;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:.75rem;margin-top:.3rem;">Round 1 — 현재 고통</div>
+            <div style="color:#4ade80;padding:.45rem 0;font-size:.82rem;align-self:flex-start;max-width:92%;">문서 관리에서 가장 큰 어려움은 무엇인가요?</div>
+            <div style="background:#ffffff;color:#1a1a1a;padding:.45rem .8rem;border-radius:6px 6px 0 6px;font-size:.82rem;align-self:flex-end;max-width:92%;">4개 팀에서 hwp·pdf·md·docx 다양한 형식으로 문서가 들어오는데, 어디에 뭐가 있는지 파악이 안 됩니다.</div>
+            <div style="color:#4ade80;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:.75rem;margin-top:.3rem;">Round 2 — 입력 · 문서 유형</div>
+            <div style="color:#4ade80;padding:.45rem 0;font-size:.82rem;align-self:flex-start;max-width:92%;">어떤 종류의 문서를 다루나요? 형식과 출처를 알려주세요.</div>
+            <div style="background:#ffffff;color:#1a1a1a;padding:.45rem .8rem;border-radius:6px 6px 0 6px;font-size:.82rem;align-self:flex-end;max-width:92%;">정부과제: 공고문·사업계획서·신청서류 (.hwp) / 개발: 외주 산출물·기술문서 (.md/.pdf) — 2개 계열, 12종 이상입니다.</div>
+            <div style="color:#4ade80;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:.75rem;margin-top:.3rem;">Round 3 — 처리 흐름 · 예외</div>
+            <div style="color:#4ade80;padding:.45rem 0;font-size:.82rem;align-self:flex-start;max-width:92%;">hwp 파일은 AI가 어떻게 처리하면 좋겠나요?</div>
+            <div style="background:#ffffff;color:#1a1a1a;padding:.45rem .8rem;border-radius:6px 6px 0 6px;font-size:.82rem;align-self:flex-end;max-width:92%;">hwp는 직접 편집 불가 → md로 변환 후 작업, 제출용만 hwp로 재변환. 원본은 보존해야 합니다.</div>
+            <div style="color:#4ade80;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:.75rem;margin-top:.3rem;">Round 4 — 출력 · 핵심 기능</div>
+            <div style="color:#4ade80;padding:.45rem 0;font-size:.82rem;align-self:flex-start;max-width:92%;">이 Agent가 반드시 해야 할 일 3가지는 무엇인가요?</div>
+            <div style="background:#ffffff;color:#1a1a1a;padding:.45rem .8rem;border-radius:6px 6px 0 6px;font-size:.82rem;align-self:flex-end;max-width:92%;">① hwp ↔ md 변환 ② 필수서류 체크리스트 ③ 문서 인덱스 관리</div>
+            <div style="color:#4ade80;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:.75rem;margin-top:.3rem;">Round 5 — 저장 · 전달</div>
+            <div style="color:#4ade80;padding:.45rem 0;font-size:.82rem;align-self:flex-start;max-width:92%;">이 Agent가 데이터를 주고받는 상대 Agent는?</div>
+            <div style="background:#ffffff;color:#1a1a1a;padding:.45rem .8rem;border-radius:6px 6px 0 6px;font-size:.82rem;align-self:flex-end;max-width:92%;">커뮤니티에서 컨설팅 피드백 수신, 리서치에 기존 참고자료 전달 — 최다 수신 허브 역할입니다.</div>
+            <div style="color:#6b7280;font-family:'JetBrains Mono',monospace;font-size:.7rem;margin-top:.3rem;">질문 1회 1개 · 총 7라운드 · 실제 문서(.hwp) 참조하며 진행</div>
           </div>
         </div>
-        <div class="vs-mid"><div class="vs-badge">VS</div></div>
-        <div class="vs-card">
-          <div class="vs-hd" style="background:#1e3a5f">
-            <h3>SKILL</h3>
-            <p>전문 도구 (Tool)</p>
-          </div>
-          <div class="vs-bd">
-            <div class="vs-row"><div class="vs-key" style="background:var(--blue)">실행</div><div class="vs-val">고정된 로직으로 정해진 처리만 수행합니다</div></div>
-            <div class="vs-row"><div class="vs-key" style="background:var(--blue)">단순</div><div class="vs-val">입력 → 처리 → 출력, 1회성 실행입니다</div></div>
-            <div class="vs-row"><div class="vs-key" style="background:var(--blue)">경량</div><div class="vs-val">필요할 때만 컨텍스트에 로드됩니다</div></div>
-            <div class="vs-row"><div class="vs-key" style="background:var(--blue)">전문화</div><div class="vs-val">특정 도메인에 최적화된 전문 기능입니다</div></div>
-            <div class="vs-row"><div class="vs-key" style="background:var(--blue)">예시</div><div class="vs-val" style="font-family:'JetBrains Mono',monospace;color:var(--blue)">parse-kakao · search-paper · convert-hwp</div></div>
+        <div class="xcell">
+          <h3 style="color:var(--green)">doc-manager 인터뷰 결과</h3>
+          <pre class="term" style="font-size:.85rem;line-height:1.75;"><span class="yl">Agent:</span> doc-manager   <span class="yl">패턴:</span> Agentic RAG
+<span class="yl">모델:</span> sonnet
+
+<span class="dim"># Pain</span>
+4팀에서 다양한 형식 문서 유입, 중복·누락
+하나의 Agent가 모든 문서를 <span class="cy">통합 관리</span>
+
+<span class="dim"># 발견</span>
+hwp ↔ md <span class="yl">양방향 변환</span> 필수
+정부과제 서류 = 필수항목 추적 필요
+문서 버전 관리 방법 <span class="rd">[확인 필요]</span>
+
+<span class="dim"># 도출 Skill</span>
+  ① convert-hwp  <span class="dim">[31.01]</span> hwp ↔ md 변환
+  ② checklist    <span class="dim">[31.02]</span> 필수서류 대조
+  ③ doc-index    <span class="dim">[31.03]</span> 문서 분류 인덱스
+  ④ feedback-log <span class="dim">[31.04]</span> 피드백 이력 추적</pre>
+          <div style="margin-top:1rem;padding:1rem;background:#1e3a2a;border-radius:6px;">
+            <h4 style="color:#4ade80;margin-bottom:.5rem;">동일 방식으로 5건 인터뷰 진행</h4>
+            <pre class="term" style="font-size:.82rem;line-height:1.7;margin:0;border:none;padding:0;"><span class="bl">doc-manager</span>  문서관리   <span class="dim">Agentic RAG</span>
+<span class="mg">simulator</span>    시뮬레이션 <span class="dim">CodeAct</span>
+<span class="cy">researcher</span>   리서치     <span class="dim">ReAct</span>
+<span class="or">community</span>    커뮤니티   <span class="dim">Tool Use</span>
+<span class="rd">reviewer</span>     검토       <span class="dim">Self-Reflect</span>
+<span class="dim">────────────────────────────────────</span>
+각 Agent별 <span class="wh">7라운드</span> × <span class="wh">3개 이하</span> 질문
+실제 문서 참조 → 구체적 Pain·발견·결론</pre>
           </div>
         </div>
       </div>
     </div>
-    <div class="ftr ftr-l"><p>Skill = Agent의 손 &nbsp;|&nbsp; Agent = 언제 어떻게 할지 판단하는 존재 &nbsp;|&nbsp; 판단이 필요한가? → Agent / 아니면 → Skill</p></div>
+    <div class="pg-foot">Agent별 인터뷰 5건 | 7라운드 질문형 인터뷰 → Pain·Skill·패턴 도출</div>
   </div>
 </div>
 
-<!-- S4 ARCHITECTURE -->
+<!-- S5 FRONTMATTER EXAMPLES -->
 <div class="slide">
-  <div class="pg pg-dark s4">
-    <div class="hdr hdr-d"><h2>전체 아키텍처</h2></div>
-    <div class="bdy">
-      <div class="arch">
-        <div class="arch-pm">PM (사람) — 요청 · 지시 · 판단</div>
-        <div class="arch-con"><div class="arch-line"></div><div class="arch-arr">↕</div><div class="arch-line"></div></div>
-        <div class="arch-main">
-          <strong>Claude 메인 세션</strong>
-          <span>라우터 · Agent 중개 · MCP 실행 (실질적 Orchestrator)</span>
+  <div class="pg">
+    <div class="pg-hdr"><h2>설계서가 자동 결정한 Agent · Skill frontmatter</h2></div>
+    <div class="pg-body">
+      <div style="background:#141414;border:1px solid #333;border-radius:6px;padding:.7rem 1.5rem;margin-bottom:.8rem;display:flex;align-items:center;gap:1.5rem;">
+        <div style="flex:1;">
+          <p style="font-size:1.1rem;color:#e5e7eb;line-height:1.7;"><strong style="color:#4ade80;">frontmatter</strong>란? — .md 파일 맨 위 <span style="color:#fbbf24;">---</span> 블록에 적는 메타데이터. Claude Code가 이 정보를 읽고 Agent의 모델·도구·설명을 자동으로 인식한다.</p>
         </div>
-        <div class="arch-con"><div class="arch-line"></div><div class="arch-arr">↓ spawn</div><div class="arch-line"></div></div>
-        <div class="arch-agents">
-          <div class="agbox" style="background:var(--orange)"><div class="ag-id">[24.01]</div><div class="ag-name">community</div><div class="ag-mdl">haiku</div><div class="ag-role">카톡 파싱·캘린더·통합스케줄</div></div>
-          <div class="agbox" style="background:var(--green)"><div class="ag-id">[23.01]</div><div class="ag-name">researcher</div><div class="ag-mdl">sonnet</div><div class="ag-role">웹검색·특허·논문·6개주제</div></div>
-          <div class="agbox" style="background:var(--blue)"><div class="ag-id">[21.01]</div><div class="ag-name">doc-manager</div><div class="ag-mdl">sonnet</div><div class="ag-role">hwp↔md·체크리스트·인덱스</div></div>
-          <div class="agbox" style="background:var(--purple)"><div class="ag-id">[22.01]</div><div class="ag-name">simulator</div><div class="ag-mdl">sonnet</div><div class="ag-role">코드리뷰·기술문서·연동포인트</div></div>
-          <div class="agbox" style="background:var(--red)"><div class="ag-id">[25.01]</div><div class="ag-name">reviewer</div><div class="ag-mdl">opus</div><div class="ag-role">품질게이트·교차검증 (예정)</div></div>
-          <div class="agbox" style="background:#374151;border:1.5px solid var(--red)"><div class="ag-id">[26.01]</div><div class="ag-name">orchestrator</div><div class="ag-mdl">haiku</div><div class="ag-role">규칙검증 (Guardian)</div></div>
+        <div style="border-left:1px solid #333;padding-left:1.5rem;flex:1;">
+          <div style="font-size:.85rem;color:#888;margin-bottom:.3rem;">frontmatter가 없다면?</div>
+          <div style="background:#ffffff;color:#1a1a1a;padding:.4rem .8rem;border-radius:6px;font-size:.9rem;">"doc-manager Agent 만들어줘. 모델은 sonnet, hwp 파싱용 Bash 필요해"</div>
+          <div style="font-size:.85rem;color:#4ade80;margin-top:.3rem;">→ Claude Code가 frontmatter를 자동 생성</div>
         </div>
-        <div class="arch-orc">
-          <div class="orc-ic">⚙️</div>
-          <div class="orc-tx">
-            <strong>cobot-orchestrator [26.01] — Guardian · haiku</strong>
-            <p>파일 생성·위치·버전 규칙 자동 검증 &nbsp;|&nbsp; 위반 시 PM 즉시 경고 &nbsp;|&nbsp; 다음 Agent 진입 게이트키퍼 &nbsp;|&nbsp; MCP는 메인 세션 전용</p>
+      </div>
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr;">
+        <div class="xcell">
+          <h3>Agent frontmatter 실제 예시</h3>
+          <pre class="term"><span class="dim">--- doc-manager.md ---</span>
+<span class="yl">name:</span> doc-manager
+<span class="yl">description:</span> "[21.01] 문서관리 Agent"
+<span class="yl">model:</span> sonnet        <span class="dim"># ← 자동 결정</span>
+<span class="yl">tools:</span>               <span class="dim"># ← 자동 결정</span>
+  - Read
+  - Write
+  - Edit
+  - Bash              <span class="dim"># hwp_parser.py</span>
+  - Glob              <span class="dim"># 문서 탐색</span>
+  - Grep              <span class="dim"># 내용 검색</span></pre>
+        </div>
+        <div class="xcell">
+          <h3>Skill frontmatter 실제 예시</h3>
+          <pre class="term"><span class="dim">--- convert-hwp/SKILL.md ---</span>
+<span class="yl">name:</span> convert-hwp
+<span class="yl">description:</span> "[31.01] hwp ↔ md 변환"
+<span class="yl">agent:</span> <span class="bl">doc-manager</span>   <span class="dim"># ← 소속 Agent</span>
+<span class="yl">aliases:</span>
+  - hwp 변환해줘        <span class="dim"># ← 자연어 호출</span>
+  - md로 변환해줘
+<span class="yl">tools:</span>
+  - Read, Write, Edit, Bash, Glob</pre>
+        </div>
+      </div>
+    </div>
+    <div class="pg-foot">Skill은 Agent에 소속, aliases로 자연어 호출 | Skill 번호(3x) = Agent 번호(2x) 대응</div>
+  </div>
+</div>
+
+<!-- S6 WORKSHEET -->
+<div class="slide">
+  <div class="pg">
+    <div class="pg-hdr"><h2>통합 워크시트: 개별로는 안 보이던 것들</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:1.6fr auto;">
+        <div class="xcell" style="border-left:3px solid var(--green);">
+          <h3 style="color:var(--green)">개별 인터뷰 5건 → 통합 재인터뷰 → 워크시트</h3>
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1rem;">
+            <div style="display:flex;flex-direction:column;gap:.4rem;flex:1;">
+              <div style="background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:.4rem .8rem;font-size:.95rem;color:#60a5fa;">doc-manager 인터뷰</div>
+              <div style="background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:.4rem .8rem;font-size:.95rem;color:#c084fc;">simulator 인터뷰</div>
+              <div style="background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:.4rem .8rem;font-size:.95rem;color:#4ade80;">researcher 인터뷰</div>
+              <div style="background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:.4rem .8rem;font-size:.95rem;color:#f97316;">community 인터뷰</div>
+              <div style="background:#1e1e1e;border:1px solid #333;border-radius:4px;padding:.4rem .8rem;font-size:.95rem;color:#f87171;">reviewer 인터뷰</div>
+            </div>
+            <div style="font-size:2rem;color:#4ade80;font-family:'JetBrains Mono',monospace;">→</div>
+            <div style="background:#1e3a2a;border:2px solid #4ade80;border-radius:6px;padding:.8rem 1.2rem;text-align:center;flex:1;">
+              <div style="font-size:1.1rem;font-weight:700;color:#4ade80;">통합 재인터뷰</div>
+              <div style="font-size:.9rem;color:#9ca3af;margin-top:.3rem;">5개 결과를 모아 교차 질문</div>
+            </div>
+            <div style="font-size:2rem;color:#4ade80;font-family:'JetBrains Mono',monospace;">→</div>
+            <div style="background:#217346;border-radius:6px;padding:.8rem 1.2rem;text-align:center;flex:1;">
+              <div style="font-size:1.1rem;font-weight:700;color:#fff;">최종 워크시트</div>
+              <div style="font-size:.9rem;color:#dcfce7;margin-top:.3rem;">worksheet_integrated.md</div>
+            </div>
+          </div>
+          <pre class="term" style="font-size:1rem;line-height:1.8;"><span class="dim"># 통합 재인터뷰에서 새로 드러난 것</span>
+<span class="yl">긴급도</span>  doc-manager &gt; researcher &gt; community &gt; reviewer &gt; simulator
+<span class="yl">허브</span>    doc-manager = 최다 수신 → 우선순위 1위 확정
+<span class="yl">빈칸</span>    개별에서 놓친 [확인 필요] 항목 5건 추가 발견</pre>
+        </div>
+        <div class="xcell" style="border-left:3px solid var(--green);">
+          <h3 style="color:var(--green)">Agent 간 데이터 흐름</h3>
+          <pre class="term" style="font-size:1.05rem;line-height:1.85;"><span class="or">community</span>             <span class="bl">researcher</span>
+  결정사항·피드백 ↘    ↙ 수집 원본 자료
+             <span class="cy">doc-manager</span>  ← <span class="mg">simulator</span>
+              (최다 수신 허브)    (기술 문서)
+                   ↓
+          산출물 + 체크리스트
+                   ↓
+             <span class="rd">reviewer</span> (품질 검증)
+          ↙                ↘
+  통과 → PM 최종     미달 → 해당 Agent 반환
+
+<span class="dim"># 개별로는 안 보이던 관계가 통합하면 드러남</span></pre>
+        </div>
+        <div class="xcell" style="grid-column:1/-1;border-left:3px solid var(--green);">
+          <h3 style="color:var(--green)">빈칸 · [확인 필요] — 모르는 건 억지로 채우지 않고 태그 처리</h3>
+          <pre class="term" style="font-size:1rem;line-height:1.7;">hwp 파싱·재변환 기술 방법     <span class="rd">[확인 필요]</span>
+참고 사이트 리스트           PM 추후 제공
+외주 인터페이스 스펙 형식    <span class="rd">[확인 필요]</span>
+구글 캘린더 MCP 연동         도입 시 검토
+검토 반복 횟수 상한          <span class="rd">[확인 필요]</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="pg-foot">개별 인터뷰 5건 → 통합 인터뷰 → worksheet_integrated.md | 개별로는 안 보이던 흐름·우선순위·빈칸이 드러남</div>
+  </div>
+</div>
+
+<!-- S7 DESIGN DOC: 프로젝트 구조 -->
+
+<!-- S7 worksheet → 설계서 -->
+<div class="slide">
+  <div class="pg">
+    <div class="pg-hdr"><h2>worksheet.md를 바탕으로 설계서 만들어줘</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr;">
+        <div class="xcell" style="grid-column:1/-1;">
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <div style="background:#ffffff;color:#1a1a1a;padding:.5rem 1rem;border-radius:6px;font-size:1.1rem;flex:1;">통합 워크시트 기반으로 프로젝트 설계서 만들어줘. Agent 정의, Skill 할당, 폴더 구조, 규칙 파일까지 전부.</div>
+            <div style="color:#4ade80;font-size:1rem;flex:1.2;">→ 설계서 하나가 아래 구조를 일괄 생성합니다.</div>
+          </div>
+        </div>
+        <div class="xcell">
+          <h3>Agent · Skill 배치</h3>
+          <pre class="term" style="font-size:.88rem;line-height:1.8;"><span class="yl">.claude/agents/</span>              <span class="dim">← 20-29</span>
+  ├── doc-manager.md       <span class="dim">[21.01] sonnet</span>
+  ├── simulator.md         <span class="dim">[22.01] sonnet</span>
+  ├── researcher.md        <span class="dim">[23.01] sonnet</span>
+  ├── community.md         <span class="dim">[24.01] haiku</span>
+  ├── reviewer.md          <span class="dim">[25.01] opus</span>
+  └── cobot-orchestrator.md<span class="dim">[26.01] haiku</span>
+
+<span class="yl">.claude/skills/</span>              <span class="dim">← 30-39</span>
+  ├── convert-hwp/         <span class="dim">[31.01]→21</span>
+  │   └── hwp_parser.py
+  ├── checklist/           <span class="dim">[31.02]→21</span>
+  ├── doc-index/           <span class="dim">[31.03]→21</span>
+  ├── feedback-log/        <span class="dim">[31.04]→21</span>
+  ├── parse-kakao/         <span class="dim">[34.01]→24</span>
+  │   └── kakao_parser.py
+  ├── search-patent/       <span class="dim">[33.02]→23</span>
+  └── <span class="dim">... 12개 Skill</span>   <span class="dim">Skill(3x) = Agent(2x)</span></pre>
+        </div>
+        <div class="xcell">
+          <h3>데이터 폴더 · 규칙 파일</h3>
+          <pre class="term" style="font-size:.88rem;line-height:1.8;"><span class="bl">50-references/</span>               <span class="dim">← 입력 자료</span>
+  ├── 51-doc/  52-kakao/  53-research/
+  ├── 54-spec/ 55-design/ 56-shared/
+  └── 59-archive/
+
+<span class="bl">60-workspace/</span>                <span class="dim">← 작업 중간물</span>
+  ├── 61-md-converted/
+  ├── 62-reports/  63-communication/
+  └── 69-archive/
+
+<span class="bl">70-output/</span>                   <span class="dim">← 최종 산출물</span>
+  ├── 71-submission/  72-checklist/
+  ├── 73-schedule/
+  └── 79-archive/
+
+<span class="yl">규칙 파일 자동 생성:</span>
+  CLAUDE.md    <span class="dim">라우팅·우선순위·문서별칭</span>
+  .mcp.json    <span class="dim">MCP 서버 설정</span>
+  rules/       <span class="dim">hwp-handling, python-style, change-log</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="pg-foot">워크시트 1개 → 설계서 → Agent 6개 · Skill 12개 · 폴더 구조 · 규칙 파일 일괄 생성 | 입력(50) → 작업(60) → 출력(70)</div>
+  </div>
+</div>
+
+<!-- S8 Agent 정의 · Skill -->
+<div class="slide">
+  <div class="pg">
+    <div class="pg-hdr"><h2>설계서: Agent 정의 · Skill 할당</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr;">
+        <div class="xcell">
+          <h3>Agent 정의 — [21.01:doc-manager]</h3>
+          <pre class="term"><span class="yl">패턴:</span> Agentic RAG    <span class="yl">모델:</span> sonnet
+<span class="yl">핵심:</span> hwp↔md 변환, 필수서류 추적, 문서 인덱스
+
+<span class="yl">Skill 파이프라인:</span>
+  ① convert-hwp → ② checklist
+  → ③ doc-index → ④ feedback-log → 보고
+
+<span class="yl">입력 수신원:</span>
+  정부과제 서류 .hwp     ← <span class="bl">51-doc/</span>
+  컨설팅 피드백 (카톡)   ← <span class="mg">[24.01:community]</span>
+  개발문서/외주 산출물   ← <span class="bl">54-spec/</span>
+
+<span class="yl">출력 → 전달 대상:</span>
+  md 변환 문서           → PM
+  hwp 재변환 (제출용)    → PM → 컨설팅
+  필수서류 체크리스트    → PM, <span class="mg">[25.01:reviewer]</span>
+  기존 참고자료          → <span class="mg">[23.01:researcher]</span></pre>
+        </div>
+        <div class="xcell">
+          <h3>Skill 예시 — /convert-hwp [31.01]</h3>
+          <pre class="term"><span class="yl">소속:</span> doc-manager    <span class="yl">호출:</span> /convert-hwp
+<span class="yl">aliases:</span> "hwp 변환해줘" "md로 변환해줘"
+
+<span class="yl">to-md</span> (hwp → md)
+  1. 51-doc/에서 hwp 확인
+  2. hwp_parser.py → 마크다운 변환
+  3. frontmatter 추가 (제목·날짜·버전)
+  4. 61-md-converted/에 저장
+
+<span class="yl">to-hwp</span> (md → hwp)
+  1. 대상 md 확인 → hwp 재변환
+  2. 71-submission/에 저장 (제출용)</pre>
+          <div style="margin-top:1rem;padding:1rem;background:#1e3a2a;border-radius:6px;">
+            <h4 style="color:#4ade80;margin-bottom:.5rem;">doc-manager Skill 파이프라인</h4>
+            <div style="display:flex;align-items:center;gap:.5rem;font-family:'JetBrains Mono',monospace;font-size:.95rem;flex-wrap:wrap;">
+              <span style="background:#217346;color:#fff;padding:.3rem .6rem;border-radius:4px;font-weight:600;">① convert-hwp</span>
+              <span style="color:#4ade80;">→</span>
+              <span style="background:#1e1e1e;border:1px solid #333;color:#e5e7eb;padding:.3rem .6rem;border-radius:4px;">② checklist</span>
+              <span style="color:#4ade80;">→</span>
+              <span style="background:#1e1e1e;border:1px solid #333;color:#e5e7eb;padding:.3rem .6rem;border-radius:4px;">③ doc-index</span>
+              <span style="color:#4ade80;">→</span>
+              <span style="background:#1e1e1e;border:1px solid #333;color:#e5e7eb;padding:.3rem .6rem;border-radius:4px;">④ feedback-log</span>
+              <span style="color:#4ade80;">→</span>
+              <span style="color:#9ca3af;">보고</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
+    <div class="pg-foot">설계서 하나로 Agent 6개 · Skill 12개 · 폴더 구조 · MCP · 규칙 파일까지 일괄 정의</div>
   </div>
 </div>
 
-<!-- S5 DATA FLOW -->
+<!-- S9 BOTTLENECK -->
 <div class="slide">
-  <div class="pg pg-light s5">
-    <div class="hdr hdr-l"><h2>데이터 흐름: 입력 → Agent → 산출물</h2></div>
-    <div class="bdy">
-      <div class="flow-outer">
-        <div class="flow-col">
-          <div class="fc-h">📥 입력층</div>
-          <div class="fitem" style="border-color:var(--orange)"><span class="ficon">📱</span>카카오톡 .txt</div>
-          <div class="fitem" style="border-color:var(--blue)"><span class="ficon">📄</span>HWP 서류</div>
-          <div class="fitem" style="border-color:var(--purple)"><span class="ficon">💻</span>시뮬레이션 코드</div>
-          <div class="fitem" style="border-color:var(--green)"><span class="ficon">🔍</span>리서치 요청</div>
+  <div class="pg">
+    <div class="pg-hdr"><h2>병목 발견: Agent 5개 + Skill 12개, 산출물 0건</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr;">
+        <div class="xcell" style="border-left:3px solid #f87171;">
+          <h3 style="color:#f87171;">초기 설계 — PM이 모든 것을 중개</h3>
+          <pre class="term" style="font-size:.9rem;line-height:1.75;">┌───────────────────────────────┐
+│     <span class="yl">PM (오케스트레이터)</span>          │
+│  요청·지시 / 최종 산출물 수신   │
+└──────┬──────────────┬─────────┘
+       │              │
+       ▼              ▼
+  <span class="or">community</span>       <span class="cy">researcher</span>
+  카톡·캘린더      웹 검색·분석
+       │              │
+       │ 피드백        │ 수집 자료
+       ▼              ▼
+  ┌─────────────────────────────┐
+  │      <span class="bl">doc-manager</span>             │
+  │  hwp↔md / 체크리스트 / 인덱스  │
+  │  ← <span class="mg">simulator</span>: 기술 문서     │
+  └──────────┬──────────────────┘
+             │ 산출물
+             ▼
+       <span class="rd">reviewer</span> (품질 검증)
+     통과 → PM  /  미달 → 반환</pre>
         </div>
-        <div class="flow-mid">
-          <div class="fc-h" style="text-align:center">🤖 Agent층</div>
-          <div class="agflow" style="background:var(--orange)"><span class="af-n">[24.01] community</span><span class="af-s">parse-kakao · schedule-sync</span></div>
-          <div class="agflow" style="background:var(--blue)"><span class="af-n">[21.01] doc-manager</span><span class="af-s">convert-hwp · doc-index · checklist</span></div>
-          <div class="agflow" style="background:var(--purple)"><span class="af-n">[22.01] simulator</span><span class="af-s">code-review · feedback-log</span></div>
-          <div class="agflow" style="background:var(--green)"><span class="af-n">[23.01] researcher</span><span class="af-s">search-paper · search-patent · report</span></div>
-          <div class="fnote">↓ reviewer (품질 검증) → orchestrator (규칙 검증) → PM 보고</div>
-        </div>
-        <div class="flow-col">
-          <div class="fc-h">📤 산출물</div>
-          <div class="fitem" style="border-color:var(--teal)"><span class="ficon">📅</span>통합 스케줄</div>
-          <div class="fitem" style="border-color:var(--blue)"><span class="ficon">📝</span>MD 변환 문서</div>
-          <div class="fitem" style="border-color:var(--blue)"><span class="ficon">✅</span>체크리스트</div>
-          <div class="fitem" style="border-color:var(--purple)"><span class="ficon">🔧</span>기술 문서</div>
-          <div class="fitem" style="border-color:var(--green)"><span class="ficon">📊</span>리서치 리포트</div>
-        </div>
-      </div>
-    </div>
-    <div class="ftr ftr-l"><p>doc-manager: 최다 수신 허브 (community · researcher · simulator 연결) &nbsp;|&nbsp; 모든 흐름은 메인 세션이 중개</p></div>
-  </div>
-</div>
-
-<!-- S6 ORCHESTRATOR -->
-<div class="slide">
-  <div class="pg pg-dark s6">
-    <div class="hdr hdr-d"><h2>Orchestrator 설계 철학: Guardian 모델</h2></div>
-    <div class="bdy">
-      <div class="orc-outer">
-        <div class="cmp">
-          <div class="cmp-h" style="color:var(--muted)">일반적인 Orchestrator</div>
-          <div class="cstep">사용자 요청</div><div class="carr">↓</div>
-          <div class="cstep">Orchestrator (사전 지휘)</div><div class="carr">↓</div>
-          <div class="cstep">Agent A → Agent B → ...</div><div class="carr">↓</div>
-          <div class="cstep">최종 결과</div>
-        </div>
-        <div class="cmp hl">
-          <div class="cmp-h" style="color:var(--red)">cobot_automation_hub — Guardian 모델</div>
-          <div class="cstep hls">사용자 요청</div><div class="carr">↓</div>
-          <div class="cstep hls">CLAUDE.md 라우터 (경량)</div><div class="carr">↓</div>
-          <div class="cstep hls">Agent 실행</div><div class="carr">↓</div>
-          <div class="cstep hls">orchestrator 사후 검증 → 통과 시 다음 단계 허가</div>
-        </div>
-        <div class="orc-feats">
-          <div class="feat"><div class="feat-ic">🔍</div><h4>사후 검증</h4><p>파일 생성 후 규칙 준수 자동 확인<br>파일명 · 위치 · 버전 규칙 검증</p></div>
-          <div class="feat"><div class="feat-ic">🚪</div><h4>게이트키퍼</h4><p>검증 통과 후에만 다음 Agent 허가<br>이중 안전장치 역할 수행</p></div>
-          <div class="feat"><div class="feat-ic">🔔</div><h4>알림 시스템</h4><p>백그라운드 실행 완료 알림<br>위반 발견 시 PM 즉시 경고</p></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- S7 MATRIX -->
-<div class="slide">
-  <div class="pg pg-light s7">
-    <div class="hdr hdr-l"><h2>Agent 간 전달 매트릭스</h2></div>
-    <div class="bdy">
-      <div class="mx-wrap">
-        <table>
-          <thead><tr><th>송신→ / 수신↓</th><th>doc-manager <span class="hub-b">허브</span></th><th>simulator</th><th>researcher</th><th>community</th><th>reviewer</th><th>orchestrator</th></tr></thead>
-          <tbody>
-            <tr><td>doc-manager</td><td>—</td><td></td><td><span class="ct">기존 참고자료</span></td><td></td><td><span class="ct">산출물+체크리스트</span></td><td><span class="cr">검증 대상</span></td></tr>
-            <tr><td>simulator</td><td><span class="ct">기술 문서</span></td><td>—</td><td><span class="ct">기술 조사 결과</span></td><td></td><td><span class="ct">코드·기술문서</span></td><td><span class="cr">검증 대상</span></td></tr>
-            <tr><td>researcher</td><td><span class="ct">수집 원본 자료</span></td><td><span class="ct">기술 조사 결과</span></td><td>—</td><td></td><td><span class="ct">리포트</span></td><td><span class="cr">검증 대상</span></td></tr>
-            <tr><td>community</td><td><span class="ct">결정사항·문서요청</span></td><td></td><td></td><td>—</td><td><span class="ct">정리 문서</span></td><td><span class="cr">검증 대상</span></td></tr>
-            <tr><td>reviewer</td><td><span class="cr">수정 요청</span></td><td><span class="cr">수정 요청</span></td><td><span class="cr">수정 요청</span></td><td><span class="cr">수정 요청</span></td><td>—</td><td><span class="cr">검증 대상</span></td></tr>
-            <tr><td>orchestrator</td><td></td><td></td><td></td><td></td><td></td><td>—</td></tr>
-          </tbody>
-        </table>
-        <div class="mx-notes">
-          <div class="mnote" style="border-color:var(--teal)"><strong>🏆 doc-manager: 최다 수신 허브</strong><p>community 3건 + researcher 1건 + simulator 1건 수신. 모든 문서화 작업이 집결합니다.</p></div>
-          <div class="mnote" style="border-color:var(--red)"><strong>🔄 reviewer: 피드백 루프 (최대 3회)</strong><p>전체 Agent 산출물 수신 4건 + 수정 요청 발신 4건. 현재 미구현 (Phase 2 예정).</p></div>
-        </div>
-      </div>
-    </div>
-    <div class="ftr ftr-l"><p>Agent 간 직접 호출 금지 &nbsp;|&nbsp; [전달] → [21.01:doc-manager]: {내용 요약} 형식으로 메인 세션이 중개</p></div>
-  </div>
-</div>
-
-<!-- S8 COMPARISON -->
-<div class="slide">
-  <div class="pg pg-light s8">
-    <div class="hdr hdr-l"><h2>Anthropic 공식 권고와의 비교</h2></div>
-    <div class="bdy">
-      <div class="cw">
-        <table>
-          <thead><tr><th>항목</th><th>Anthropic 권고</th><th>cobot 설계</th><th>평가</th></tr></thead>
-          <tbody>
-            <tr><td>단순성 우선</td><td>필요할 때만 복잡도 증가</td><td>CLAUDE.md 경량 라우터</td><td class="ck">✅</td></tr>
-            <tr><td>Human-in-the-loop</td><td>중요 결정 사람이 승인</td><td>[확인 필요] 태그 시스템</td><td class="ck">✅</td></tr>
-            <tr><td>Agent 간 통신</td><td>메인 세션이 중개</td><td>직접 호출 금지 규칙</td><td class="ck">✅</td></tr>
-            <tr><td>Skill 분리</td><td>전문 지식 폴더화</td><td>11개 스킬 agent별 할당</td><td class="ck">✅</td></tr>
-            <tr class="srow"><td>사후 검증</td><td style="color:#94a3b8;font-style:italic">별도 언급 없음</td><td>orchestrator Guardian 모델</td><td class="star-c">🌟 독창적</td></tr>
-            <tr><td>Progressive Disclosure</td><td>필요 시만 컨텍스트 로드</td><td>agent별 최소 토큰 설계</td><td class="ck">✅</td></tr>
-            <tr><td>MCP 제약</td><td>권고사항 존재</td><td>메인 세션 전용, 백그라운드 불가</td><td class="ck">✅</td></tr>
-            <tr><td>투명성</td><td>행동을 명시적으로 드러낼 것</td><td>결과 보고 형식 표준화</td><td class="ck">✅</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="ftr ftr-l"><p>대부분 Anthropic 공식 권고와 일치 &nbsp;|&nbsp; Guardian 모델은 독창적 확장 설계</p></div>
-  </div>
-</div>
-
-<!-- S9 ROADMAP -->
-<div class="slide">
-  <div class="pg pg-light s9">
-    <div class="hdr hdr-l"><h2>향후 확장 계획</h2></div>
-    <div class="bdy">
-      <div class="ph-wrap">
-        <div class="ph-card">
-          <div class="ph-head" style="background:var(--teal)"><div class="ph-lbl">Phase 1</div><h3>현재 운영 중</h3></div>
-          <div class="ph-body">
-            <div class="phitem"><div class="phdot" style="background:var(--teal)"></div><span>community · researcher · doc-manager · simulator · orchestrator 운영</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--teal)"></div><span>CLAUDE.md 기반 라우팅</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--teal)"></div><span>[확인 필요] 태그 시스템 운영</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--teal)"></div><span>orchestrator Guardian 검증 자동화</span></div>
+        <div class="xcell" style="border-left:3px solid #f87171;">
+          <h3 style="color:#f87171;">무엇이 문제였나?</h3>
+          <ul>
+            <li><strong>설계는 완벽했지만 실행 검증이 없었다</strong><br>Agent 5개·Skill 12개를 만들었으나 실제 산출물은 0건</li>
+            <li><strong>doc-manager에서 병목</strong><br>hwp 파싱 실패, 파일 배치 규칙 위반, change_log 누락 — 후속 Agent가 진행 불가</li>
+            <li><strong>규칙 준수를 검증하는 주체가 없었다</strong><br>PM이 매번 직접 확인해야 함 → 자동화의 의미 상실</li>
+            <li><strong>Agent 간 직접 호출 시 예측 불가</strong><br>누가 누구를 호출했는지 추적 불가, 충돌 발생</li>
+          </ul>
+          <div style="margin-top:1rem;padding:.8rem;background:#3b1111;border:1px solid #f87171;border-radius:6px;">
+            <p style="font-size:1.1rem;color:#f87171;font-weight:700;">→ 중급 자료(automation-pipeline-design-eduv)로<br>　시뮬레이션 테스트 + 재인터뷰 진행</p>
           </div>
-          <div class="ph-foot" style="color:var(--teal)">✅ 완료</div>
-        </div>
-        <div class="ph-card">
-          <div class="ph-head" style="background:var(--blue)"><div class="ph-lbl">Phase 2</div><h3>단기 계획</h3></div>
-          <div class="ph-body">
-            <div class="phitem"><div class="phdot" style="background:var(--blue)"></div><span>reviewer (25.01) 구현 및 활성화</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--blue)"></div><span>내용 품질 게이트 추가</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--blue)"></div><span>orchestrator 대상에 reviewer 포함</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--blue)"></div><span>문서 중복 제거 자동화</span></div>
-          </div>
-          <div class="ph-foot" style="color:var(--blue)">🔄 진행 예정</div>
-        </div>
-        <div class="ph-card">
-          <div class="ph-head" style="background:var(--orange)"><div class="ph-lbl">Phase 3</div><h3>장기 계획</h3></div>
-          <div class="ph-body">
-            <div class="phitem"><div class="phdot" style="background:var(--orange)"></div><span>Subagent 도입으로 병렬 처리</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--orange)"></div><span>CLAUDE.md 규칙 분리 (.claude/rules/)</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--orange)"></div><span>Agent Teams 활용 검토</span></div>
-            <div class="phitem"><div class="phdot" style="background:var(--orange)"></div><span>비용 · 토큰 거버넌스 강화</span></div>
-          </div>
-          <div class="ph-foot" style="color:var(--orange)">🔍 검토 중</div>
         </div>
       </div>
     </div>
-    <div class="ftr ftr-l"><p>확장 신호: Agent 7개 이상 &nbsp;|&nbsp; CLAUDE.md 3k 토큰 초과 &nbsp;|&nbsp; 병렬 처리 필요 &nbsp;|&nbsp; 라우팅 오류 빈발</p></div>
+    <div class="pg-foot">설계 완료 ≠ 실행 검증 | doc-manager 병목 → Guardian orchestrator 필요성 발견</div>
   </div>
 </div>
 
-<!-- S10 SUMMARY -->
+<!-- S10 SOLUTION: Simulation & Orchestrator -->
 <div class="slide">
-  <div class="pg pg-dark s10">
-    <div class="sum-b">
-      <p class="sum-t">핵심 설계 원칙 요약</p>
-      <div class="prow"><span class="pnum">01</span><div class="ptxt"><strong>역할의 명확한 분리</strong><span>Skill(도구) vs Agent(판단자) vs Orchestrator(검증자)로 책임을 명확히 분리했습니다</span></div></div>
-      <div class="prow"><span class="pnum">02</span><div class="ptxt"><strong>메인 세션이 실질적 Orchestrator</strong><span>CLAUDE.md는 경량 라우터, 진짜 조율과 중개는 Claude 메인 세션이 담당합니다</span></div></div>
-      <div class="prow"><span class="pnum">03</span><div class="ptxt"><strong>Guardian 모델 (독창적 설계)</strong><span>orchestrator를 사전 지휘자가 아닌 사후 게이트키퍼로 설계했습니다</span></div></div>
-      <div class="prow"><span class="pnum">04</span><div class="ptxt"><strong>Human-in-the-loop 강제화</strong><span>[확인 필요] 태그로 PM 승인을 시스템 규칙으로 내재화했습니다</span></div></div>
-      <div class="prow"><span class="pnum">05</span><div class="ptxt"><strong>Agent 간 직접 호출 금지</strong><span>메인 세션이 유일한 중개자 — 예측 가능하고 안전한 흐름을 보장합니다</span></div></div>
+  <div class="pg">
+    <div class="pg-hdr"><h2>시뮬레이션 후 개선: orchestrator + 메인 세션 중개</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:7fr 3fr;grid-template-rows:1fr;">
+        <div class="xcell" style="border-left:3px solid #4ade80;">
+          <h3 style="color:#4ade80;">개선된 Agent 대화 구조</h3>
+          <pre class="mermaid" style="background:transparent;">
+graph TD
+    PM(["PM (사람)<br/>요청·지시·판단"])
+    CLAUDE["Claude 메인 세션<br/>(제어자 — Agent 호출·중개·MCP 실행)"]
+
+    DOC["[21.01] doc-manager<br/>문서관리 · sonnet<br/>hwp↔md, 체크리스트, 인덱스, 피드백"]
+    SIM["[22.01] simulator<br/>시뮬레이션 · sonnet<br/>코드 리뷰, 기술 문서, 연동 포인트"]
+    RES["[23.01] researcher<br/>리서치 · sonnet<br/>웹 검색, 특허, 논문, 6개 주제"]
+    COM["[24.01] community<br/>커뮤니티 · haiku<br/>카톡 파싱, 캘린더, 통합스케줄"]
+    REV["[25.01] reviewer<br/>검토 · opus<br/>품질 게이트, 교차 검증"]
+    ORC["[26.01] orchestrator<br/>Guardian · haiku<br/>규칙 준수 검증"]
+
+    %% ── PM ↔ Claude 메인 세션 ──
+    PM -->|"요청·지시·카톡 txt 제공"| CLAUDE
+    CLAUDE -->|"결과 보고·[확인 필요] 질문"| PM
+    PM -->|"판단·확정·승인"| CLAUDE
+
+    %% ── Claude 메인 세션 → Agent (spawn) ──
+    CLAUDE ==>|"spawn (백그라운드)"| DOC
+    CLAUDE ==>|"spawn (백그라운드)"| SIM
+    CLAUDE ==>|"spawn (백그라운드)"| RES
+    CLAUDE ==>|"spawn (백그라운드)"| COM
+    CLAUDE ==>|"spawn (포그라운드)"| REV
+    CLAUDE ==>|"spawn (자동 호출)"| ORC
+
+    %% ── Agent → Claude 메인 세션 (결과 반환) ──
+    DOC -->|"md 변환·체크리스트·hwp 제출용"| CLAUDE
+    SIM -->|"연동 포인트·기술 문서"| CLAUDE
+    RES -->|"요약 리포트·비교 분석표"| CLAUDE
+    COM -->|"카톡 분석·[확인 필요]·캘린더 후보·통합스케줄"| CLAUDE
+
+    %% ── Claude 메인 세션이 중개하는 Agent 간 전달 ──
+    COM -.->|"결정사항·피드백·문서체크요청"| DOC
+    RES -.->|"수집 원본 자료"| DOC
+    SIM -.->|"기술 문서"| DOC
+    DOC -.->|"기존 참고자료"| RES
+    RES -.->|"기술 조사 결과"| SIM
+
+    %% ── 전체 → reviewer (산출물 검토) ──
+    DOC -.->|"산출물 + 체크리스트"| REV
+    SIM -.->|"코드·기술문서"| REV
+    RES -.->|"리포트"| REV
+    COM -.->|"정리 문서"| REV
+
+    %% ── reviewer → 수정 요청 (피드백 루프 최대 3회) ──
+    REV -.->|"수정 요청"| DOC
+    REV -.->|"수정 요청"| SIM
+    REV -.->|"수정 요청"| RES
+    REV -.->|"수정 요청"| COM
+
+    %% ── 전체 → orchestrator (파일 변경 시 자동 호출) ──
+    DOC -.->|"검증 대상"| ORC
+    SIM -.->|"검증 대상"| ORC
+    RES -.->|"검증 대상"| ORC
+    COM -.->|"검증 대상"| ORC
+    REV -.->|"검증 대상"| ORC
+
+    %% ── MCP (메인 세션 전용) ──
+    CLAUDE -->|"MCP 호출<br/>(Google Calendar 등)"| MCP["외부 서비스<br/>Google Calendar"]
+
+    %% ── 스타일 ──
+    style PM fill:#7a6200,stroke:#FFD700,color:#fff
+    style CLAUDE fill:#1a1a2e,stroke:#FFD700,color:#fff
+    style DOC fill:#1e3a5f,stroke:#4A90D9,color:#fff
+    style SIM fill:#2d1f6e,stroke:#7B68EE,color:#fff
+    style RES fill:#0f4a2a,stroke:#2ECC71,color:#fff
+    style COM fill:#5c3010,stroke:#E67E22,color:#fff
+    style REV fill:#5c1010,stroke:#E74C3C,color:#fff
+    style ORC fill:#3a3f42,stroke:#95A5A6,color:#fff
+    style MCP fill:#2a2a2a,stroke:#888,color:#e5e7eb
+          </pre>
+        </div>
+        <div class="xcell" style="border-left:3px solid #4ade80;">
+          <h3 style="color:#4ade80;">orchestrator — Guardian 사후 검증</h3>
+          <pre class="term" style="font-size:.9rem;line-height:1.75;"><span class="dim"># Agent 작업 완료 후 자동 호출 (haiku)</span>
+<span class="dim"># 설계서를 직접 Read하여 검증</span>
+
+<span class="yl">검증 7항목:</span>
+  1. change_log 기록 여부
+  2. 파일명 규칙 준수
+  3. archive 정책 준수
+  4. [확인 필요] 미처리 항목
+  5. 중요 사항 알림 여부
+  6. 디렉토리·파일 배치
+  7. Agent 간 경로 충돌
+
+<span class="yl">자동 수정:</span> log 보완 2건만
+<span class="yl">나머지:</span>   PM 보고 필수</pre>
+          <div style="margin-top:1rem;padding:.8rem;background:#1e3a2a;border:1px solid #4ade80;border-radius:6px;">
+            <p style="font-size:1rem;color:#4ade80;line-height:1.6;"><strong>Agent A 완료</strong> → 메인 세션 결과 수신 → <strong>orchestrator 자동 호출</strong> → 검증 통과 시 → 다음 Agent 진행</p>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="sum-foot">
-      <span>cobot_automation_hub · Cobot PM · 2026</span>
-      <span class="tf">Claude Code 기반 자동화</span>
+    <div class="pg-foot">시뮬레이션·재인터뷰로 도출 | Agent 간 직접 호출 금지 + Guardian 사후 검증 = 예측 가능한 자동화</div>
+  </div>
+</div>
+
+<!-- S11 ARCHITECTURE -->
+<div class="slide">
+  <div class="pg" style="background:#0c0c0c;">
+    <div class="pg-hdr" style="background:#1a1a1a;border-color:#333;"><h2 style="color:var(--green-tx)">전체 아키텍처</h2></div>
+    <div class="pg-body" style="align-items:center;justify-content:center;gap:.8rem;padding:1rem 3rem 3.5rem;">
+      <div style="background:#1e1e1e;border:1px solid #fbbf24;border-radius:6px;padding:1.2rem 4rem;text-align:center;">
+        <span style="font-size:1.5rem;font-weight:700;color:#fbbf24;">PM (사람) — 요청 · 지시 · 판단</span>
+      </div>
+      <div style="text-align:center;color:#4ade80;font-family:'JetBrains Mono',monospace;font-size:1.3rem;">│</div>
+      <div style="background:var(--green);border-radius:6px;padding:1.2rem 4rem;text-align:center;">
+        <strong style="color:#fff;font-size:1.4rem;">Claude 메인 세션</strong><br>
+        <span style="color:#dcfce7;font-size:1.1rem;">라우터 · Agent 중개 · MCP 실행 (실질적 Orchestrator)</span>
+      </div>
+      <div style="text-align:center;color:#4ade80;font-family:'JetBrains Mono',monospace;font-size:1.1rem;">▼ spawn</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:1.2rem;width:100%;">
+        <div style="background:#1e1e1e;border:2px solid #f97316;border-radius:6px;padding:1.2rem 1rem;text-align:center;">
+          <div style="font-size:.9rem;color:#999;font-family:'JetBrains Mono',monospace;">[24.01]</div>
+          <div style="font-size:1.3rem;font-weight:700;color:#f97316;">community</div>
+          <div style="font-size:1rem;color:#aaa;">haiku</div>
+          <div style="font-size:1rem;color:#ccc;margin-top:.4rem;">카톡·캘린더·스케줄</div>
+        </div>
+        <div style="background:#1e1e1e;border:2px solid var(--green);border-radius:6px;padding:1.2rem 1rem;text-align:center;">
+          <div style="font-size:.9rem;color:#999;font-family:'JetBrains Mono',monospace;">[23.01]</div>
+          <div style="font-size:1.3rem;font-weight:700;color:var(--green-tx);">researcher</div>
+          <div style="font-size:1rem;color:#aaa;">sonnet</div>
+          <div style="font-size:1rem;color:#ccc;margin-top:.4rem;">웹·특허·논문</div>
+        </div>
+        <div style="background:#1e1e1e;border:2px solid #60a5fa;border-radius:6px;padding:1.2rem 1rem;text-align:center;">
+          <div style="font-size:.9rem;color:#999;font-family:'JetBrains Mono',monospace;">[21.01]</div>
+          <div style="font-size:1.3rem;font-weight:700;color:#60a5fa;">doc-manager</div>
+          <div style="font-size:1rem;color:#aaa;">sonnet</div>
+          <div style="font-size:1rem;color:#ccc;margin-top:.4rem;">hwp·체크·인덱스</div>
+        </div>
+        <div style="background:#1e1e1e;border:2px solid #c084fc;border-radius:6px;padding:1.2rem 1rem;text-align:center;">
+          <div style="font-size:.9rem;color:#999;font-family:'JetBrains Mono',monospace;">[22.01]</div>
+          <div style="font-size:1.3rem;font-weight:700;color:#c084fc;">simulator</div>
+          <div style="font-size:1rem;color:#aaa;">sonnet</div>
+          <div style="font-size:1rem;color:#ccc;margin-top:.4rem;">코드·기술문서</div>
+        </div>
+        <div style="background:#1e1e1e;border:2px solid #f87171;border-radius:6px;padding:1.2rem 1rem;text-align:center;">
+          <div style="font-size:.9rem;color:#999;font-family:'JetBrains Mono',monospace;">[25.01]</div>
+          <div style="font-size:1.3rem;font-weight:700;color:#f87171;">reviewer</div>
+          <div style="font-size:1rem;color:#aaa;">opus</div>
+          <div style="font-size:1rem;color:#ccc;margin-top:.4rem;">품질·교차검증</div>
+        </div>
+      </div>
+      <div style="text-align:center;color:#4ade80;font-family:'JetBrains Mono',monospace;font-size:1.1rem;">▼ 파일 변경 시 자동 호출</div>
+      <div style="background:#1e1e1e;border:2px solid #f87171;border-radius:6px;padding:1.2rem 3rem;width:100%;display:flex;align-items:center;gap:1.5rem;">
+        <div>
+          <strong style="color:#f87171;font-size:1.3rem;">cobot-orchestrator [26.01] — Guardian · haiku</strong>
+          <p style="color:#ccc;font-size:1.05rem;margin-top:.4rem;">파일 생성·위치·버전 규칙 자동 검증 | 위반 시 PM 즉시 경고 | 다음 Agent 진입 게이트키퍼 | MCP는 메인 세션 전용</p>
+        </div>
+      </div>
     </div>
+  </div>
+</div>
+
+<!-- S12 FEATURES: Guardian + Agent 격리 -->
+<div class="slide">
+  <div class="pg">
+    <div class="pg-hdr"><h2>설계 포인트: Guardian + Agent 격리</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr;">
+        <div class="xcell">
+          <h3 style="font-size:2.1rem;">Guardian Orchestrator — 사후 검증 7항목</h3>
+          <p style="font-size:1.4rem;line-height:1.6;">일반 orchestrator = 사전 지휘자. 이 프로젝트 = <strong>사후 게이트키퍼</strong>.</p>
+          <pre class="term" style="margin-top:.6rem;font-size:1.2rem;line-height:2;"><span class="dim"># 설계서를 직접 Read한 뒤 검증 (기억/추측 금지)</span>
+<span class="yl">1.</span> change_log 기록    <span class="yl">5.</span> 중요 사항 알림
+<span class="yl">2.</span> 파일명 규칙        <span class="yl">6.</span> 디렉토리·파일 배치
+<span class="yl">3.</span> archive 정책       <span class="yl">7.</span> Agent 간 경로 충돌
+<span class="yl">4.</span> [확인 필요] 항목
+
+<span class="dim"># 자동 수정은 log 보완 2건만</span>
+<span class="dim"># 나머지는 PM 보고 필수</span></pre>
+        </div>
+        <div class="xcell">
+          <h3 style="font-size:2.1rem;">Agent 간 직접 호출 금지 — 메인 세션 중개</h3>
+          <p style="font-size:1.4rem;line-height:1.6;">Agent는 서로를 모른다. 모든 전달은 메인 세션이 중개.</p>
+          <pre class="term" style="margin-top:.6rem;font-size:1.2rem;line-height:2;"><span class="dim"># community 결과 보고에 포함</span>
+<span class="rd">[전달]</span> → <span class="bl">[21.01:doc-manager]</span>:
+  컨설팅 피드백 추출분 3건
+  미확보 파일 목록 (저장위치 제안 포함)
+
+<span class="dim"># 메인 세션이 받아서 doc-manager에 전달</span>
+<span class="dim"># Agent A → 메인 세션 → Agent B</span>
+<span class="dim"># 예측 가능하고 안전한 흐름 보장</span></pre>
+        </div>
+      </div>
+    </div>
+    <div class="pg-foot">Guardian = 독창적 설계 (Anthropic 권고에 없음) | Agent 간 직접 호출 금지 → 예측 가능한 흐름</div>
+  </div>
+</div>
+
+<!-- S13 FEATURES: Human-in-the-loop + 설계서 자동 구성 -->
+<div class="slide">
+  <div class="pg">
+    <div class="pg-hdr"><h2>설계 포인트: Human-in-the-loop + 자동 구성</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr;">
+        <div class="xcell">
+          <h3>Human-in-the-loop: 1건씩 프로토콜</h3>
+          <p>[확인 필요] 항목을 한꺼번에 나열하지 않는다.</p>
+          <pre class="term" style="margin-top:.6rem"><span class="rd">[확인 필요]</span> <span class="yl">1/5</span> — 일정 확정
+"3/28 시뮬레이션 팀 미팅"을 캘린더에
+등록할까요?
+→ <span class="wh">예 / 아니오 / 수정</span>
+
+<span class="dim"># PM 응답 후 다음 1건 진행</span>
+<span class="dim"># 한꺼번에 5건 나열 → 금지</span></pre>
+        </div>
+        <div class="xcell">
+          <h3>설계서 → 프로젝트 자동 구성</h3>
+          <p>설계서 하나가 결정하는 것들:</p>
+          <ul>
+            <li><strong>폴더 구조</strong> — Johnny Decimal (50-references ~ 79-archive)</li>
+            <li><strong>Agent 정의 6개</strong> — model · tools · 패턴 · 실행모드 · 저장경로</li>
+            <li><strong>Skill 할당 12개</strong> — Agent 소속 · aliases · 파이프라인 순서</li>
+            <li><strong>MCP 연동</strong> — Google Calendar · KIPRIS (메인 세션 전용 규칙)</li>
+            <li><strong>CLAUDE.md</strong> — 라우팅 규칙 · Agent 우선순위 · 문서 별칭</li>
+            <li><strong>rules/</strong> — hwp-handling.md · python-style.md · change-log.md</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="pg-foot">MCP 메인 세션 전용 → 3-Phase 탄생 | 1건씩 확인 = 안전한 자동화 | 설계서 1개 → 프로젝트 전체 구조</div>
+  </div>
+</div>
+
+<!-- S14 CASES -->
+<div class="slide">
+  <div class="pg">
+    <div class="pg-hdr"><h2>앞으로 할 것</h2></div>
+    <div class="pg-body">
+      <div class="xgrid" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr;">
+        <div class="xcell" style="border-left:4px solid #f97316;">
+          <h3 style="font-size:2.2rem;">인터뷰 시뮬레이션으로 스킬 수정·최적화</h3>
+          <ul style="margin-top:1rem;">
+            <li style="font-size:1.5rem;line-height:2;">학습 자료 21개 → 인덱스 + 활용 가이드 정리</li>
+            <li style="font-size:1.5rem;line-height:2;">기존 Agent 6개 순차 시뮬레이션으로 빈틈 발견</li>
+            <li style="font-size:1.5rem;line-height:2;">인터뷰 시뮬레이션으로 새 스킬 설계 & 리팩토링</li>
+            <li style="font-size:1.5rem;line-height:2;">한 줄 프롬프트:<br><span style="color:#4ade80;font-family:'JetBrains Mono',monospace;font-size:1.3rem;">"활용가이드 C로 doc-manager 시뮬레이션 해줘"</span></li>
+          </ul>
+        </div>
+        <div class="xcell" style="border-left:4px solid var(--green);">
+          <h3 style="font-size:2.2rem;">도움 받은 자료</h3>
+          <h4 style="font-size:1.6rem;color:#4ade80;margin-top:.8rem;">안상영 — automation-pipeline-design-eduv</h4>
+          <ul style="margin-top:1rem;">
+            <li style="font-size:1.5rem;line-height:2;">6단계: 인터뷰 → 워크시트 → 설계 → 도구 연결 → 오케스트레이션 → Agent 변환</li>
+            <li style="font-size:1.5rem;line-height:2;">AI 오케스트레이터 패턴 6가지 학습 문서</li>
+            <li style="font-size:1.5rem;line-height:2;">Claude Code 내장도구 완전자동화 가이드</li>
+            <li style="font-size:1.5rem;line-height:2;">업무정의-자동화-위임설계서 인터뷰 가이드</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="pg-foot" style="display:flex;justify-content:space-between;"><span>전석환 · cobot_automation_hub · 2026</span><span style="color:var(--accent)">Claude Code 기반 인터뷰 → Agent 설계</span></div>
   </div>
 </div>
 
 </div>
 <div id="nav">
-  <button id="pb" onclick="go(-1)" disabled>←</button>
-  <span id="ctr">1 / 10</span>
-  <button id="nb" onclick="go(1)">→</button>
+  <button id="pb" onclick="go(-1)" disabled>&#8592;</button>
+  <span id="ctr">1 / 14</span>
+  <button id="nb" onclick="go(1)">&#8594;</button>
 </div>
 <script>
 const slides=document.querySelectorAll('.slide');
 const total=slides.length;
 let cur=0;
-const de=document.getElementById('dots');
-slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot'+(i===0?' on':'');d.onclick=()=>goTo(i);de.appendChild(d);});
 function ui(){
   document.getElementById('ctr').textContent=`${cur+1} / ${total}`;
   document.getElementById('snum').textContent=`${String(cur+1).padStart(2,'0')} / ${String(total).padStart(2,'0')}`;
   document.getElementById('pb').disabled=cur===0;
   document.getElementById('nb').disabled=cur===total-1;
   document.getElementById('prog').style.width=`${((cur+1)/total)*100}%`;
-  document.querySelectorAll('.dot').forEach((d,i)=>d.classList.toggle('on',i===cur));
 }
 function goTo(n){
   if(n<0||n>=total||n===cur)return;
-  slides[cur].classList.remove('active');slides[cur].classList.add('exit');
-  const p=cur;cur=n;
-  setTimeout(()=>slides[p].classList.remove('exit'),480);
-  slides[cur].classList.add('active');ui();
+  slides[cur].classList.remove('active');
+  cur=n;
+  slides[cur].classList.add('active');
+  ui();
 }
 function go(d){goTo(cur+d);}
 document.addEventListener('keydown',e=>{
@@ -530,6 +866,29 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowLeft'||e.key==='ArrowUp')go(-1);
 });
 ui();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({
+  startOnLoad:false,
+  theme:'dark',
+  themeVariables:{
+    primaryColor:'#1e3a2a',primaryBorderColor:'#4ade80',primaryTextColor:'#e5e7eb',
+    lineColor:'#4ade80',secondaryColor:'#1e1e1e',tertiaryColor:'#141414',
+    fontSize:'14px'
+  }
+});
+// slides가 opacity로 전환되므로 active 될 때 렌더링
+const observer=new MutationObserver(()=>{
+  document.querySelectorAll('.slide.active .mermaid:not([data-processed])').forEach(el=>{
+    mermaid.run({nodes:[el]});
+  });
+});
+document.querySelectorAll('.slide').forEach(s=>{
+  observer.observe(s,{attributes:true,attributeFilter:['class']});
+});
+// 초기 로드 시 active 슬라이드
+mermaid.run({nodes:document.querySelectorAll('.slide.active .mermaid')});
 </script>
 </body>
 </html>
